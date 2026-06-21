@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>かんたん AI チャット</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 40rem;
+        padding: 2rem 1rem;
+        line-height: 1.6;
+      }
+      h1 {
+        font-size: 1.4rem;
+      }
+      #log {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin: 1.5rem 0;
+      }
+      .msg {
+        padding: 0.6rem 0.9rem;
+        border-radius: 0.8rem;
+        max-width: 85%;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .me {
+        align-self: flex-end;
+        background: #2563eb;
+        color: #fff;
+      }
+      .ai {
+        align-self: flex-start;
+        background: rgba(127, 127, 127, 0.18);
+      }
+      form {
+        display: flex;
+        gap: 0.5rem;
+      }
+      #message {
+        flex: 1;
+        font: inherit;
+        padding: 0.7rem;
+        box-sizing: border-box;
+      }
+      button {
+        font: inherit;
+        padding: 0.7rem 1.1rem;
+      }
+      button:disabled {
+        opacity: 0.5;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>かんたん AI チャット</h1>
+    <p>メッセージを入力して送信すると、AI が返事をします。</p>
+
+    <div id="log" aria-live="polite"></div>
+
+    <form id="chat-form">
+      <input id="message" maxlength="4000" placeholder="メッセージを入力…" autocomplete="off" required />
+      <button id="send" type="submit">送信</button>
+    </form>
+
+    <script>
+      // === デプロイした Worker の URL に書き換えてください ===
+      // 例: https://kimikara-cf-workers.<あなたのサブドメイン>.workers.dev
+      const WORKER_URL = "https://kimikara-cf-workers.example.workers.dev";
+
+      const form = document.querySelector("#chat-form");
+      const input = document.querySelector("#message");
+      const button = document.querySelector("#send");
+      const log = document.querySelector("#log");
+
+      function addMessage(text, who) {
+        const el = document.createElement("div");
+        el.className = `msg ${who}`;
+        el.textContent = text;
+        log.append(el);
+        el.scrollIntoView({ block: "end" });
+        return el;
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const message = input.value.trim();
+        if (!message) return;
+
+        addMessage(message, "me");
+        input.value = "";
+        button.disabled = true;
+        const pending = addMessage("…", "ai");
+
+        try {
+          const response = await fetch(`${WORKER_URL.replace(/\/+$/, "")}/api/chat`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              studentId: "demo-student",
+              publicAppId: "cf-sample-site",
+              message,
+            }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.message || data.error || `HTTP ${response.status}`);
+          }
+          pending.textContent = data.text;
+        } catch (error) {
+          pending.textContent = `エラー: ${error instanceof Error ? error.message : "通信に失敗しました。"}`;
+        } finally {
+          button.disabled = false;
+          input.focus();
+        }
+      });
+    </script>
+  </body>
+</html>
